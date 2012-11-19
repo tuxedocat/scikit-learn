@@ -198,6 +198,7 @@ class OneVsRestClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
 
         return predict_ovr(self.estimators_, self.label_binarizer_, X)
 
+
     def predict_prob(self, X):
         """Predict multi-class targets using underlying estimators with probabilities.
 
