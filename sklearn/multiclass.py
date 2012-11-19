@@ -57,6 +57,16 @@ def _predict_binary(estimator, X):
     return score
 
 
+def _predict_binary_prob(estimator, X):
+    """Make predictions with probabilities for each class using a single binary estimator."""
+    try:
+        # probabilities of the positive class
+        score = estimator.predict_proba(X)[:, 1]
+    except (AttributeError, NotImplementedError):
+        score = None
+    return score
+
+
 def _check_estimator(estimator):
     """Make sure that an estimator implements the necessary methods."""
     if not hasattr(estimator, "decision_function") and \
@@ -83,6 +93,12 @@ def predict_ovr(estimators, label_binarizer, X):
     e = estimators[0]
     thresh = 0 if hasattr(e, "decision_function") and is_classifier(e) else .5
     return label_binarizer.inverse_transform(Y.T, threshold=thresh)
+
+
+def predict_ovr_prob(estimators, label_binarizer, X):
+    """Make predictions with probabilities using the one-vs-the-rest strategy."""
+    Y = np.array([_predict_binary_prob(e, X) for e in estimators])
+    return Y.T
 
 
 class _ConstantPredictor(BaseEstimator):
@@ -181,6 +197,23 @@ class OneVsRestClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         self._check_is_fitted()
 
         return predict_ovr(self.estimators_, self.label_binarizer_, X)
+
+    def predict_prob(self, X):
+        """Predict multi-class targets using underlying estimators with probabilities.
+
+        Parameters
+        ----------
+        X: {array-like, sparse matrix}, shape = [n_samples, n_features]
+            Data.
+
+        Returns
+        -------
+        y : array-like, shape = [n_samples]
+            Predicted probabilities of each class.
+        """
+        self._check_is_fitted()
+
+        return predict_ovr_prob(self.estimators_, self.label_binarizer_, X)
 
     @property
     def multilabel_(self):
