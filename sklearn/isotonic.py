@@ -67,7 +67,7 @@ def isotonic_regression(y, weight=None, y_min=None, y_max=None):
         value0, value1, value2 = 0, 0, np.inf
         weight0, weight1, weight2 = 1, 1, 1
         while value0 * weight1 <= value1 * weight0 and \
-              current < len(active_set) - 1:
+                current < len(active_set) - 1:
             value0, weight0, idx0 = active_set[current]
             value1, weight1, idx1 = active_set[current + 1]
             if value0 * weight1 <= value1 * weight0:
@@ -87,9 +87,8 @@ def isotonic_regression(y, weight=None, y_min=None, y_max=None):
             value2, weight2, idx2 = active_set[current - 1]
             if weight0 * value2 >= weight2 * value0:
                 active_set.pop(current)
-                active_set[current - 1] = (value0 + value2,
-                                  weight0 + weight2,
-                                  idx0 + idx2)
+                active_set[current - 1] = (value0 + value2, weight0 + weight2,
+                                           idx0 + idx2)
                 current -= 1
 
     solution = np.empty(len(y))
@@ -196,7 +195,7 @@ class IsotonicRegression(BaseEstimator, TransformerMixin, RegressorMixin):
             raise ValueError("X should be a vector")
 
         f = interpolate.interp1d(self.X_, self.y_, kind='linear',
-            bounds_error=True)
+                                 bounds_error=True)
         return f(T)
 
     def fit_transform(self, X, y, weight=None):
@@ -228,9 +227,8 @@ class IsotonicRegression(BaseEstimator, TransformerMixin, RegressorMixin):
         X, y, weight = check_arrays(X, y, weight, sparse_format='dense')
         y = as_float_array(y)
         self._check_fit_data(X, y, weight)
-        order = np.argsort(X)
-        order_inv = np.zeros(len(y), dtype=np.int)
-        order_inv[order] = np.arange(len(y))
+        order = np.lexsort((y, X))
+        order_inv = np.argsort(order)
         self.X_ = as_float_array(X[order], copy=False)
         self.y_ = isotonic_regression(y[order], weight, self.y_min, self.y_max)
         return self.y_[order_inv]

@@ -11,7 +11,7 @@ import numbers
 import numpy as np
 import scipy.sparse as sp
 
-from .utils import check_arrays, array2d, atleast2d_or_csr
+from .utils import check_arrays, array2d, atleast2d_or_csr, safe_asarray
 from .utils import warn_if_not_float
 from .utils.fixes import unique
 from .base import BaseEstimator, TransformerMixin
@@ -33,7 +33,7 @@ __all__ = ['Binarizer',
 
 
 def _mean_and_std(X, axis=0, with_mean=True, with_std=True):
-    """Compute mean and std dev for centering, scaling
+    """Compute mean and std deviation for centering, scaling.
 
     Zero valued std components are reset to 1.0 to avoid NaNs when scaling.
     """
@@ -184,12 +184,15 @@ class MinMaxScaler(BaseEstimator, TransformerMixin):
             used for later scaling along the features axis.
         """
         X = check_arrays(X, sparse_format="dense", copy=self.copy)[0]
+        warn_if_not_float(X, estimator=self)
         feature_range = self.feature_range
         if feature_range[0] >= feature_range[1]:
             raise ValueError("Minimum of desired feature range must be smaller"
                              " than maximum. Got %s." % str(feature_range))
         min_ = np.min(X, axis=0)
         scale_ = np.max(X, axis=0) - min_
+        # Do not scale constant features
+        scale_[scale_ == 0.0] = 1.0
         self.scale_ = (feature_range[1] - feature_range[0]) / scale_
         self.min_ = feature_range[0] - min_ / scale_
         return self
@@ -351,7 +354,7 @@ class StandardScaler(BaseEstimator, TransformerMixin):
 class Scaler(StandardScaler):
     def __init__(self, copy=True, with_mean=True, with_std=True):
         warnings.warn("Scaler was renamed to StandardScaler. The old name "
-                " will be removed in 0.15.", DeprecationWarning)
+                      " will be removed in 0.15.", DeprecationWarning)
         super(Scaler, self).__init__(copy, with_mean, with_std)
 
 
@@ -590,9 +593,8 @@ def _is_label_indicator_matrix(y):
 def _is_multilabel(y):
     # the explicit check for ndarray is for forward compatibility; future
     # versions of Numpy might want to register ndarray as a Sequence
-    return not isinstance(y[0], np.ndarray) and isinstance(y[0], Sequence) \
-       and not isinstance(y[0], basestring) \
-        or _is_label_indicator_matrix(y)
+    return (not isinstance(y[0], np.ndarray) and isinstance(y[0], Sequence) and
+            not isinstance(y[0], basestring) or _is_label_indicator_matrix(y))
 
 
 class OneHotEncoder(BaseEstimator, TransformerMixin):
@@ -691,12 +693,12 @@ class OneHotEncoder(BaseEstimator, TransformerMixin):
             try:
                 n_values = np.asarray(self.n_values, dtype=int)
             except (ValueError, TypeError):
-                raise TypeError("Wrong type for parameter `n_values`."
-                        " Expected 'auto', int or array of ints, got %r"
-                        % type(X))
+                raise TypeError("Wrong type for parameter `n_values`. Expected"
+                                " 'auto', int or array of ints, got %r"
+                                % type(X))
             if n_values.ndim < 1 or n_values.shape[0] != X.shape[1]:
-                raise ValueError("Shape mismatch: if n_values is "
-                        "an array, it has to be of shape (n_features,).")
+                raise ValueError("Shape mismatch: if n_values is an array,"
+                                 " it has to be of shape (n_features,).")
         self.n_values_ = n_values
         n_values = np.hstack([[0], n_values])
         indices = np.cumsum(n_values)
@@ -707,7 +709,8 @@ class OneHotEncoder(BaseEstimator, TransformerMixin):
                                 n_features)
         data = np.ones(n_samples * n_features)
         out = sp.coo_matrix((data, (row_indices, column_indices)),
-                shape=(n_samples, indices[-1]), dtype=self.dtype).tocsr()
+                            shape=(n_samples, indices[-1]),
+                            dtype=self.dtype).tocsr()
 
         if self.n_values == 'auto':
             mask = np.array(out.sum(axis=0)).ravel() != 0
@@ -750,7 +753,8 @@ class OneHotEncoder(BaseEstimator, TransformerMixin):
                                 n_features)
         data = np.ones(n_samples * n_features)
         out = sp.coo_matrix((data, (row_indices, column_indices)),
-                shape=(n_samples, indices[-1]), dtype=self.dtype).tocsr()
+                            shape=(n_samples, indices[-1]),
+                            dtype=self.dtype).tocsr()
         if self.n_values == 'auto':
             out = out[:, self.active_features_]
         return out
@@ -985,8 +989,8 @@ class LabelBinarizer(BaseEstimator, TransformerMixin):
         y_is_multilabel = _is_multilabel(y)
 
         if y_is_multilabel and not self.multilabel:
-            raise ValueError("The object was not " +
-                    "fitted with multilabel input!")
+            raise ValueError("The object was not fitted with multilabel"
+                             " input!")
 
         elif self.multilabel:
             if not _is_multilabel(y):
@@ -1080,8 +1084,11 @@ class LabelBinarizer(BaseEstimator, TransformerMixin):
 class KernelCenterer(BaseEstimator, TransformerMixin):
     """Center a kernel matrix
 
-    This is equivalent to centering phi(X) with
-    sklearn.preprocessing.StandardScaler(with_std=False).
+    Let K(x_i, x_j) be a kernel defined by K(x_i, x_j) = phi(x_i)^T phi(x_j),
+    where phi(x) is a function mapping x to a hilbert space. KernelCenterer is
+    a class to center (i.e., normalize to have zero-mean) the data without
+    explicitly computing phi(x). It is equivalent equivalent to centering
+    phi(x) with sklearn.preprocessing.StandardScaler(with_std=False).
     """
 
     def fit(self, K, y=None):
@@ -1126,3 +1133,63 @@ class KernelCenterer(BaseEstimator, TransformerMixin):
         K += self.K_fit_all_
 
         return K
+
+
+def add_dummy_feature(X, value=1.0):
+    """Augment dataset with an additional dummy feature.
+
+    This is useful for fitting an intercept term with implementations which
+    cannot otherwise fit it directly.
+
+    Parameters
+    ----------
+    X : array or scipy.sparse matrix with shape [n_samples, n_features]
+        Data.
+
+    value : float
+        Value to use for the dummy feature.
+
+    Returns
+    -------
+
+    X : array or scipy.sparse matrix with shape [n_samples, n_features + 1]
+        Same data with dummy feature added as first column.
+
+    Example
+    --------
+
+    >>> from sklearn.preprocessing import add_dummy_feature
+    >>> add_dummy_feature([[0, 1], [1, 0]])
+    array([[ 1.,  0.,  1.],
+           [ 1.,  1.,  0.]])
+    """
+    X = safe_asarray(X)
+    n_samples, n_features = X.shape
+    shape = (n_samples, n_features + 1)
+    if sp.issparse(X):
+        if sp.isspmatrix_coo(X):
+            # Shift columns to the right.
+            col = X.col + 1
+            # Column indices of dummy feature are 0 everywhere.
+            col = np.concatenate((np.zeros(n_samples), col))
+            # Row indices of dummy feature are 0, ..., n_samples-1.
+            row = np.concatenate((np.arange(n_samples), X.row))
+            # Prepend the dummy feature n_samples times.
+            data = np.concatenate((np.ones(n_samples) * value, X.data))
+            return sp.coo_matrix((data, (row, col)), shape)
+        elif sp.isspmatrix_csc(X):
+            # Shift index pointers since we need to add n_samples elements.
+            indptr = X.indptr + n_samples
+            # indptr[0] must be 0.
+            indptr = np.concatenate((np.array([0]), indptr))
+            # Row indices of dummy feature are 0, ..., n_samples-1.
+            indices = np.concatenate((np.arange(n_samples), X.indices))
+            # Prepend the dummy feature n_samples times.
+            data = np.concatenate((np.ones(n_samples) * value, X.data))
+            return sp.csc_matrix((data, indices, indptr), shape)
+        else:
+            klass = X.__class__
+            X = klass(add_dummy_feature(X.tocoo(), value))
+            return klass(X)
+    else:
+        return np.hstack((np.ones((n_samples, 1)) * value, X))

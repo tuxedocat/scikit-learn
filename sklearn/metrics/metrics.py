@@ -10,9 +10,11 @@ better
 # Authors: Alexandre Gramfort <alexandre.gramfort@inria.fr>
 #          Mathieu Blondel <mathieu@mblondel.org>
 #          Olivier Grisel <olivier.grisel@ensta.org>
+#          Arnaud Joly <a.joly@ulg.ac.be>
 # License: BSD Style.
 
 from itertools import izip
+import warnings
 import numpy as np
 from scipy.sparse import coo_matrix
 
@@ -39,13 +41,13 @@ def confusion_matrix(y_true, y_pred, labels=None):
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        true targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        estimated targets
+        Estimated targets as returned by a classifier.
 
     labels : array, shape = [n_classes]
-        lists all labels occuring in the dataset.
+        List of all labels occuring in the dataset.
         If none is given, those that appear at least once
         in y_true or y_pred are used.
 
@@ -80,7 +82,7 @@ def confusion_matrix(y_true, y_pred, labels=None):
     return CM
 
 
-def roc_curve(y_true, y_score):
+def roc_curve(y_true, y_score, pos_label=None):
     """compute Receiver operating characteristic (ROC)
 
     Note: this implementation is restricted to the binary classification task.
@@ -89,19 +91,23 @@ def roc_curve(y_true, y_score):
     ----------
 
     y_true : array, shape = [n_samples]
-        true binary labels
+        True binary labels in range {0, 1} or {-1, 1}.
+        If labels are not binary, pos_label should be explictly given.
 
     y_score : array, shape = [n_samples]
-        target scores, can either be probability estimates of
+        Target scores, can either be probability estimates of
         the positive class, confidence values, or binary decisions.
+
+    pos_label : int
+        Label considered as positive and others are considered negative.
 
     Returns
     -------
     fpr : array, shape = [>2]
-        False Positive Rates
+        False Positive Rates.
 
     tpr : array, shape = [>2]
-        True Positive Rates
+        True Positive Rates.
 
     thresholds : array, shape = [>2]
         Thresholds on y_score used to compute fpr and tpr.
@@ -118,7 +124,7 @@ def roc_curve(y_true, y_score):
     >>> from sklearn import metrics
     >>> y = np.array([1, 1, 2, 2])
     >>> scores = np.array([0.1, 0.4, 0.35, 0.8])
-    >>> fpr, tpr, thresholds = metrics.roc_curve(y, scores)
+    >>> fpr, tpr, thresholds = metrics.roc_curve(y, scores, pos_label=2)
     >>> fpr
     array([ 0. ,  0.5,  0.5,  1. ])
 
@@ -128,19 +134,37 @@ def roc_curve(y_true, y_score):
 
     """
     y_true = np.ravel(y_true)
+    y_score = np.ravel(y_score)
     classes = np.unique(y_true)
 
-    # ROC only for binary classification
-    if classes.shape[0] != 2:
-        raise ValueError("ROC is defined for binary classification only")
+    # ROC only for binary classification if pos_label not given
+    if (pos_label is None and
+        not (np.all(classes == [0, 1]) or
+             np.all(classes == [-1, 1]) or
+             np.all(classes == [0]) or
+             np.all(classes == [-1]) or
+             np.all(classes == [1]))):
+        raise ValueError("ROC is defined for binary classification only or "
+                         "pos_label should be explicitly given")
+    elif pos_label is None:
+        pos_label = 1.
 
-    y_score = np.ravel(y_score)
+    # y_true will be transformed into a boolean vector
+    y_true = (y_true == pos_label)
+    n_pos = float(y_true.sum())
+    n_neg = y_true.shape[0] - n_pos
 
-    n_pos = float(np.sum(y_true == classes[1]))  # nb of true positive
-    n_neg = float(np.sum(y_true == classes[0]))  # nb of true negative
+    if n_pos == 0:
+        warnings.warn("No positive samples in y_true, "
+                      "true positve value should be meaningless")
+        n_pos = np.nan
+    if n_neg == 0:
+        warnings.warn("No negative samples in y_true, "
+                      "false positve value should be meaningless")
+        n_neg = np.nan
 
     thresholds = np.unique(y_score)
-    neg_value, pos_value = classes[0], classes[1]
+    neg_value, pos_value = False, True
 
     tpr = np.empty(thresholds.size, dtype=np.float)  # True positive rate
     fpr = np.empty(thresholds.size, dtype=np.float)  # False positive rate
@@ -179,6 +203,12 @@ def roc_curve(y_true, y_score):
         fpr = np.array([0.0, fpr[0], 1.0])
         tpr = np.array([0.0, tpr[0], 1.0])
 
+    if n_pos is np.nan:
+        tpr[0] = np.nan
+
+    if n_neg is np.nan:
+        fpr[0] = np.nan
+
     return fpr, tpr, thresholds[::-1]
 
 
@@ -193,10 +223,10 @@ def average_precision_score(y_true, y_score):
     ----------
 
     y_true : array, shape = [n_samples]
-        true binary labels
+        True binary labels.
 
     y_score : array, shape = [n_samples]
-        target scores, can either be probability estimates of
+        Target scores, can either be probability estimates of
         the positive class, confidence values, or binary decisions.
 
     Returns
@@ -226,10 +256,10 @@ def auc_score(y_true, y_score):
     ----------
 
     y_true : array, shape = [n_samples]
-        true binary labels
+        True binary labels.
 
     y_score : array, shape = [n_samples]
-        target scores, can either be probability estimates of
+        Target scores, can either be probability estimates of
         the positive class, confidence values, or binary decisions.
 
     Returns
@@ -278,7 +308,7 @@ def auc(x, y, reorder=False):
     >>> from sklearn import metrics
     >>> y = np.array([1, 1, 2, 2])
     >>> pred = np.array([0.1, 0.4, 0.35, 0.8])
-    >>> fpr, tpr, thresholds = metrics.roc_curve(y, pred)
+    >>> fpr, tpr, thresholds = metrics.roc_curve(y, pred, pos_label=2)
     >>> metrics.auc(fpr, tpr)
     0.75
 
@@ -322,13 +352,13 @@ def precision_score(y_true, y_pred, labels=None, pos_label=1,
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        Predicted targets
+        Estimated targets as returned by a classifier.
 
     labels : array
-        Integer array of labels
+        Integer array of labels.
 
     pos_label : int
         In the binary classification case, give the label of the positive
@@ -376,13 +406,13 @@ def recall_score(y_true, y_pred, labels=None, pos_label=1, average='weighted'):
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        Predicted targets
+        Estimated targets as returned by a classifier.
 
     labels : array
-        Integer array of labels
+        Integer array of labels.
 
     pos_label : int
         In the binary classification case, give the label of the positive
@@ -432,16 +462,16 @@ def fbeta_score(y_true, y_pred, beta, labels=None, pos_label=1,
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        Predicted targets
+        Estimated targets as returned by a classifier.
 
     beta: float
         Weight of precision in harmonic mean.
 
     labels : array
-        Integer array of labels
+        Integer array of labels.
 
     pos_label : int
         In the binary classification case, give the label of the positive
@@ -485,7 +515,7 @@ def fbeta_score(y_true, y_pred, beta, labels=None, pos_label=1,
 
 
 def f1_score(y_true, y_pred, labels=None, pos_label=1, average='weighted'):
-    """Compute f1 score
+    """Compute the f1 score of a prediction.
 
     The F1 score can be interpreted as a weighted average of the precision
     and recall, where an F1 score reaches its best value at 1 and worst
@@ -502,10 +532,10 @@ def f1_score(y_true, y_pred, labels=None, pos_label=1, average='weighted'):
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        Predicted targets
+        Estimated targets as returned by a classifier.
 
     labels : array
         Integer array of labels
@@ -572,10 +602,10 @@ def precision_recall_fscore_support(y_true, y_pred, beta=1.0, labels=None,
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        Predicted targets
+        Estimated targets as returned by a classifier.
 
     beta : float, 1.0 by default
         The strength of recall versus precision in the f-score.
@@ -708,10 +738,10 @@ def matthews_corrcoef(y_true, y_pred):
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        true targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        estimated targets
+        Estimated targets as returned by a classifier.
 
     Returns
     -------
@@ -738,16 +768,16 @@ def classification_report(y_true, y_pred, labels=None, target_names=None):
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets
+        Ground truth (correct) target values.
 
     y_pred : array, shape = [n_samples]
-        Estimated targets
+        Estimated targets as returned by a classifier.
 
     labels : array, shape = [n_labels]
-        Optional list of label indices to include in the report
+        Optional list of label indices to include in the report.
 
     target_names : list of strings
-        Optional display names matching the labels (same order)
+        Optional display names matching the labels (same order).
 
     Returns
     -------
@@ -805,7 +835,7 @@ def classification_report(y_true, y_pred, labels=None, target_names=None):
 
 
 def precision_recall_curve(y_true, probas_pred):
-    """Compute precision-recall pairs for different probability thresholds
+    """Compute precision-recall pairs for different probability thresholds.
 
     Note: this implementation is restricted to the binary classification task.
 
@@ -825,21 +855,21 @@ def precision_recall_curve(y_true, probas_pred):
     Parameters
     ----------
     y_true : array, shape = [n_samples]
-        True targets of binary classification in range {-1, 1} or {0, 1}
+        True targets of binary classification in range {-1, 1} or {0, 1}.
 
     probas_pred : array, shape = [n_samples]
-        Estimated probabilities
+        Estimated probabilities or decision function.
 
     Returns
     -------
     precision : array, shape = [n + 1]
-        Precision values
+        Precision values.
 
     recall : array, shape = [n + 1]
-        Recall values
+        Recall values.
 
     thresholds : array, shape = [n]
-        Thresholds on y_score used to compute precision and recall
+        Thresholds on y_score used to compute precision and recall.
 
     """
     y_true = np.ravel(y_true)
@@ -909,13 +939,19 @@ def explained_variance_score(y_true, y_pred):
 
     Note: the explained variance is not a symmetric function.
 
-    return the explained variance
-
     Parameters
     ----------
     y_true : array-like
+        Ground truth (correct) target values.
 
     y_pred : array-like
+        Estimated target values.
+
+    Returns
+    -------
+    score : float
+        explained variance
+
 
     """
     y_true, y_pred = check_arrays(y_true, y_pred)
@@ -938,9 +974,11 @@ def r2_score(y_true, y_pred):
 
     Parameters
     ----------
-    y_true : array-like
+    y_true : array-like of shape = [n_samples] or [n_samples, n_outputs]
+        Ground truth (correct) target values.
 
-    y_pred : array-like
+    y_pred : array-like of shape = [n_samples] or [n_samples, n_outputs]
+        Estimated target values.
 
     Returns
     -------
@@ -960,7 +998,8 @@ def r2_score(y_true, y_pred):
         raise ValueError("r2_score can only be computed given more than one"
                          " sample.")
     numerator = ((y_true - y_pred) ** 2).sum()
-    denominator = ((y_true - y_true.mean()) ** 2).sum()
+    denominator = ((y_true - y_true.mean(axis=0)) ** 2).sum()
+
     if denominator == 0.0:
         if numerator == 0.0:
             return 1.0
@@ -968,6 +1007,7 @@ def r2_score(y_true, y_pred):
             # arbitary set to zero to avoid -inf scores, having a constant
             # y_true is not interesting for scoring a regression anyway
             return 0.0
+
     return 1 - numerator / denominator
 
 
@@ -982,7 +1022,7 @@ def zero_one_score(y_true, y_pred):
     Parameters
     ----------
     y_true : array-like, shape = n_samples
-        Gold standard labels.
+        Ground truth (correct) labels.
 
     y_pred : array-like, shape = n_samples
         Predicted labels, as returned by a classifier.
@@ -1029,16 +1069,41 @@ def mean_squared_error(y_true, y_pred):
 
     Parameters
     ----------
-    y_true : array-like
+    y_true : array-like of shape = [n_samples] or [n_samples, n_outputs]
+        Ground truth (correct) target values.
 
-    y_pred : array-like
+    y_pred : array-like of shape = [n_samples] or [n_samples, n_outputs]
+        Estimated target values.
 
     Returns
     -------
     loss : float
+
     """
     y_true, y_pred = check_arrays(y_true, y_pred)
     return np.mean((y_pred - y_true) ** 2)
+
+
+def mean_absolute_error(y_true, y_pred):
+    """Mean absolute error regression loss
+
+    Return a a positive floating point value (the best value is 0.0).
+
+    Parameters
+    ----------
+    y_true : array-like of shape = [n_samples] or [n_samples, n_outputs]
+        Ground truth (correct) target values.
+
+    y_pred : array-like of shape = [n_samples] or [n_samples, n_outputs]
+        Estimated target values.
+
+    Returns
+    -------
+    loss : float
+
+    """
+    y_true, y_pred = check_arrays(y_true, y_pred)
+    return np.mean(np.abs(y_pred - y_true))
 
 
 def hinge_loss(y_true, pred_decision, pos_label=1, neg_label=-1):

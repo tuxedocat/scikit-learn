@@ -159,6 +159,7 @@ Loaders
    datasets.load_linnerud
    datasets.fetch_mldata
    datasets.fetch_olivetti_faces
+   datasets.fetch_california_housing
    datasets.load_sample_image
    datasets.load_sample_images
    datasets.load_svmlight_file
@@ -232,6 +233,29 @@ Samples generator
    decomposition.dict_learning_online
    decomposition.sparse_encode
 
+.. _dummy_ref:
+
+:mod:`sklearn.dummy`: Dummy estimators
+======================================
+
+.. automodule:: sklearn.dummy
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`model_evaluation` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   dummy.DummyClassifier
+   dummy.DummyRegressor
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
 
 .. _ensemble_ref:
 
@@ -261,6 +285,23 @@ Samples generator
 .. autosummary::
    :toctree: generated/
    :template: function.rst
+
+
+partial dependence
+------------------
+
+.. automodule:: sklearn.ensemble.partial_dependence
+   :no-members:
+   :no-inherited-members:
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   ensemble.partial_dependence.partial_dependence
+   ensemble.partial_dependence.plot_partial_dependence
 
 
 .. _feature_extraction_ref:
@@ -477,8 +518,9 @@ From text
    :toctree: generated/
    :template: class.rst
 
-   kernel_approximation.RBFSampler
    kernel_approximation.AdditiveChi2Sampler
+   kernel_approximation.Nystroem
+   kernel_approximation.RBFSampler
    kernel_approximation.SkewedChi2Sampler
 
 :mod:`sklearn.semi_supervised` Semi-Supervised Learning
@@ -595,18 +637,23 @@ From text
     manifold.LocallyLinearEmbedding
     manifold.Isomap
     manifold.MDS
+    manifold.SpectralEmbedding
 
 .. autosummary::
     :toctree: generated
     :template: function.rst
 
     manifold.locally_linear_embedding
+    manifold.spectral_embedding
 
 
 .. _metrics_ref:
 
 :mod:`sklearn.metrics`: Metrics
 ===============================
+
+See the :ref:`model_evaluation` section and the :ref:`metrics` section of the
+user guide for further details.
 
 .. automodule:: sklearn.metrics
    :no-members:
@@ -621,31 +668,36 @@ Classification metrics
    :toctree: generated/
    :template: function.rst
 
-   metrics.confusion_matrix
-   metrics.roc_curve
    metrics.auc
-   metrics.precision_score
-   metrics.recall_score
-   metrics.fbeta_score
-   metrics.f1_score
    metrics.auc_score
    metrics.average_precision_score
-   metrics.precision_recall_fscore_support
    metrics.classification_report
+   metrics.confusion_matrix
+   metrics.f1_score
+   metrics.fbeta_score
+   metrics.hinge_loss
    metrics.precision_recall_curve
+   metrics.precision_recall_fscore_support
+   metrics.precision_score
+   metrics.recall_score
+   metrics.roc_curve
    metrics.zero_one_score
    metrics.zero_one
-   metrics.hinge_loss
 
 Regression metrics
 ------------------
+
+See the :ref:`regression_metrics` section of the user guide for further
+details.
 
 .. autosummary::
    :toctree: generated/
    :template: function.rst
 
-   metrics.r2_score
+   metrics.mean_absolute_error
    metrics.mean_squared_error
+   metrics.r2_score
+
 
 Clustering metrics
 ------------------
@@ -685,15 +737,17 @@ Pairwise metrics
    :toctree: generated/
    :template: function.rst
 
+   metrics.pairwise.additive_chi2_kernel
+   metrics.pairwise.chi2_kernel
+   metrics.pairwise.distance_metrics
    metrics.pairwise.euclidean_distances
-   metrics.pairwise.manhattan_distances
+   metrics.pairwise.kernel_metrics
    metrics.pairwise.linear_kernel
+   metrics.pairwise.manhattan_distances
+   metrics.pairwise.pairwise_distances
+   metrics.pairwise.pairwise_kernels
    metrics.pairwise.polynomial_kernel
    metrics.pairwise.rbf_kernel
-   metrics.pairwise.distance_metrics
-   metrics.pairwise.pairwise_distances
-   metrics.pairwise.kernel_metrics
-   metrics.pairwise.pairwise_kernels
 
 
 .. _mixture_ref:
@@ -878,9 +932,10 @@ Pairwise metrics
    :toctree: generated/
    :template: function.rst
 
-   preprocessing.scale
-   preprocessing.normalize
+   preprocessing.add_dummy_feature
    preprocessing.binarize
+   preprocessing.normalize
+   preprocessing.scale
 
 
 :mod:`sklearn.qda`: Quadratic Discriminant Analysis
@@ -899,6 +954,33 @@ Pairwise metrics
    :template: class.rst
 
    qda.QDA
+
+.. _random_projection_ref:
+
+:mod:`sklearn.random_projection`: Random projection
+===================================================
+
+.. automodule:: sklearn.random_projection
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`random_projection` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   random_projection.GaussianRandomProjection
+   random_projection.SparseRandomProjection
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   random_projection.johnson_lindenstrauss_min_dim
+
 
 .. _svm_ref:
 

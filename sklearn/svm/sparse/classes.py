@@ -1,3 +1,5 @@
+import warnings
+
 from .. import LinearSVC as GeneralLinearSVC
 from ..base import BaseSVC
 from ...base import RegressorMixin
@@ -30,7 +32,7 @@ class SVC(SparseBaseLibSVM, BaseSVC):
             gamma=0.0, kernel='rbf', max_iter=-1, probability=False,
             shrinking=True, tol=0.001, verbose=False)
     >>> print(clf.predict([[-0.8, -1]]))
-    [ 1.]
+    [1]
     """
 
     def __init__(self, C=1.0, kernel='rbf', degree=3, gamma=0.0,
@@ -68,17 +70,18 @@ class NuSVC(SparseBaseLibSVM, BaseSVC):
             kernel='rbf', max_iter=-1, nu=0.5, probability=False,
             shrinking=True, tol=0.001, verbose=False)
     >>> print(clf.predict([[-0.8, -1]]))
-    [ 1.]
+    [1]
     """
 
-    def __init__(self, nu=0.5, kernel='rbf', degree=3, gamma=0.0,
-                 coef0=0.0, shrinking=True, probability=False,
-                 tol=1e-3, cache_size=200, class_weight=None,
-                 verbose=False, max_iter=-1):
-
-        super(NuSVC, self).__init__('nu_svc', kernel, degree, gamma, coef0,
-                tol, 0., nu, 0., shrinking, probability, cache_size,
-                class_weight, verbose, max_iter)
+    def __init__(self, nu=0.5, kernel='rbf', degree=3, gamma=0.0, coef0=0.0,
+                 shrinking=True, probability=False, tol=1e-3, cache_size=200,
+                 class_weight=None, verbose=False, max_iter=-1):
+        if class_weight is not None:
+            warnings.warn("Parameter class_weight is not supported in NuSVC "
+                          "and will be ignored.", stacklevel=2)
+        super(NuSVC, self).__init__(
+            'nu_svc', kernel, degree, gamma, coef0, tol, 0., nu, 0., shrinking,
+            probability, cache_size, None, verbose, max_iter)
 
 
 @deprecated("""to be removed in v0.14;
@@ -110,8 +113,8 @@ class SVR(SparseBaseLibSVM, RegressorMixin):
     """
 
     def __init__(self, kernel='rbf', degree=3, gamma=0.0, coef0=0.0, tol=1e-3,
-            C=1.0, epsilon=0.1, shrinking=True, probability=False,
-            cache_size=200, verbose=False, max_iter=-1):
+                 C=1.0, epsilon=0.1, shrinking=True, probability=False,
+                 cache_size=200, verbose=False, max_iter=-1):
 
         super(SVR, self).__init__('epsilon_svr', kernel, degree, gamma, coef0,
                                   tol, C, 0., epsilon, shrinking, probability,
@@ -147,12 +150,12 @@ class NuSVR(SparseBaseLibSVM, RegressorMixin):
     """
 
     def __init__(self, nu=0.5, C=1.0, kernel='rbf', degree=3, gamma=0.0,
-            coef0=0.0, shrinking=True, epsilon=0.1, probability=False,
-            tol=1e-3, cache_size=200, verbose=False, max_iter=-1):
+                 coef0=0.0, shrinking=True, epsilon=0.1, probability=False,
+                 tol=1e-3, cache_size=200, verbose=False, max_iter=-1):
 
-        super(NuSVR, self).__init__('nu_svr', kernel, degree, gamma, coef0,
-                tol, C, nu, epsilon, shrinking, probability, cache_size,
-                None, verbose, max_iter)
+        super(NuSVR, self).__init__(
+            'nu_svr', kernel, degree, gamma, coef0, tol, C, nu, epsilon,
+            shrinking, probability, cache_size, None, verbose, max_iter)
 
 
 @deprecated("""to be removed in v0.14;
@@ -170,12 +173,12 @@ class OneClassSVM(SparseBaseLibSVM):
     """
 
     def __init__(self, kernel='rbf', degree=3, gamma=0.0, coef0=0.0, tol=1e-3,
-            nu=0.5, shrinking=True, probability=False, cache_size=200,
-            verbose=False, max_iter=-1):
+                 nu=0.5, shrinking=True, probability=False, cache_size=200,
+                 verbose=False, max_iter=-1):
 
-        super(OneClassSVM, self).__init__('one_class', kernel, degree, gamma,
-                coef0, tol, 0.0, nu, 0.0, shrinking, probability, cache_size,
-                None, verbose, max_iter)
+        super(OneClassSVM, self).__init__(
+            'one_class', kernel, degree, gamma, coef0, tol, 0.0, nu, 0.0,
+            shrinking, probability, cache_size, None, verbose, max_iter)
 
     def fit(self, X, sample_weight=None):
         super(OneClassSVM, self).fit(
